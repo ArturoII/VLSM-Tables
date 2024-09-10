@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VLSM Calculator</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        /* Custom styles to give a unique look while still using Bootstrap */
+        body {
+            background-color: #e3f2fd;
+            color: #0d47a1;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        .container {
+            flex: 1;
+        }
+        .card {
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        .btn-primary {
+            background-color: #0d47a1;
+            border-color: #0d47a1;
+        }
+        .btn-success {
+            background-color: #388e3c;
+            border-color: #388e3c;
+        }
+        .btn-primary:hover, .btn-success:hover {
+            background-color: #0b374d;
+        }
+        .table th {
+            background-color: #0d47a1;
+            color: #fff;
+        }
+        footer {
+            background-color: #0d47a1;
+            color: white;
+            text-align: center;
+            padding: 10px 0;
+            width: 100%;
+            margin-top: 20px; /* Add some margin above the footer */
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <div class="card p-4">
+            <h1 class="text-center mb-4">VLSM Calculator</h1>
+            <div class="row">
+                <div class="col-lg-6 mx-auto">
+                    <form>
+                        <div class="form-floating mb-3">
+                            <input type="text" class="form-control" id="network" placeholder="Enter base network">
+                            <label for="network">Base Network (e.g., 192.168.0.0/24)</label>
+                        </div>
+                        <div class="form-floating mb-3">
+                            <input type="number" class="form-control" id="subnetCount" placeholder="Enter number of subnets" min="1">
+                            <label for="subnetCount">Number of Subnets</label>
+                        </div>
+                        <button type="button" class="btn btn-primary w-100" onclick="generateSubnets()">Generate Subnets</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4" id="subnetsContainer" style="display:none;">
+            <div class="col-lg-8 mx-auto">
+                <div class="card p-4">
+                    <h3 class="text-center mb-3">Subnets</h3>
+                    <div id="subnets"></div>
+                    <button class="btn btn-success w-100 mt-3" onclick="calculateVLSM()">Calculate VLSM</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-lg-8 mx-auto">
+                <div class="card p-4">
+                    <h3 class="text-center mb-3">VLSM Result</h3>
+                    <div id="vlsmTable" class="table-responsive"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer with Creator Names -->
+    <footer>
+        <p>Created by Juan David Guarnizo Castaño 230212002 and Brandon David Quintero Herrera 230212019</p>
+    </footer>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        /**
+         * Function: generateSubnets()
+         * Purpose: This function dynamically generates input fields for the user to enter the names and number of hosts for a specified number of subnets.
+         * Operation: It reads the desired number of subnets from an input field, clears any existing inputs, and then loops to create the required number of input fields, making them visible for the user.
+         */
+        function generateSubnets() {
+            const subnetCount = document.getElementById('subnetCount').value;
+            const subnetsContainer = document.getElementById('subnets');
+            subnetsContainer.innerHTML = '';
+    
+            for (let i = 0; i < subnetCount; i++) {
+                subnetsContainer.innerHTML += `
+                    <div class="mb-3">
+                        <label for="subnetName${i}" class="form-label">Subnet Name ${i+1}</label>
+                        <input type="text" class="form-control" id="subnetName${i}" placeholder="Enter subnet name">
+                        <label for="hostCount${i}" class="form-label">Number of Hosts</label>
+                        <input type="number" class="form-control" id="hostCount${i}" placeholder="Enter number of hosts" min="1">
+                    </div>
+                `;
+            }
+    
+            document.getElementById('subnetsContainer').style.display = 'block';
+        }
+    
+        /**
+         * Function: calculateVLSM()
+         * Purpose: This function calculates the subnet details using Variable Length Subnet Masking (VLSM) based on user inputs, such as the base network address and the number of hosts for each subnet.
+         * Operation: It gathers user inputs for the base network and subnets, sorts the subnets by required host count, calculates the network details (e.g., subnet mask, first host, last host), and displays the results in a table format.
+         */
+        function calculateVLSM() {
+            const network = document.getElementById('network').value;
+            const subnetCount = document.getElementById('subnetCount').value;
+            const vlsmTable = document.getElementById('vlsmTable');
+            vlsmTable.innerHTML = '';
+    
+            let subnetsData = [];
+    
+            for (let i = 0; i < subnetCount; i++) {
+                const subnetName = document.getElementById(`subnetName${i}`).value;
+                const hostCount = document.getElementById(`hostCount${i}`).value;
+    
+                subnetsData.push({ name: subnetName, hosts: parseInt(hostCount) });
+            }
+    
+            subnetsData.sort((a, b) => b.hosts - a.hosts);
+    
+            let baseNetwork = network.split('/')[0];
+            let basePrefix = parseInt(network.split('/')[1]);
+    
+            function calculateNextSubnet(currentNetwork, increment) {
+                let [oct1, oct2, oct3, oct4] = currentNetwork.split('.').map(Number);
+                let incrementedValue = (oct4 + increment);
+                if (incrementedValue >= 256) {
+                    oct4 = incrementedValue % 256;
+                    oct3 += Math.floor(incrementedValue / 256);
+                } else {
+                    oct4 = incrementedValue;
+                }
+                return `${oct1}.${oct2}.${oct3}.${oct4}`;
+            }
+    
+            function calculateSubnetMask(prefixLength) {
+                return ((-1 << (32 - prefixLength)) >>> 0)
+                    .toString(2)
+                    .match(/.{8}/g)
+                    .map(bin => parseInt(bin, 2))
+                    .join('.');
+            }
+    
+            let currentNetwork = baseNetwork;
+    
+            vlsmTable.innerHTML = `
+                <table class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th>Subnet Name</th>
+                            <th>Subnet</th>
+                            <th>First Host</th>
+                            <th>Last Host</th>
+                            <th>Broadcast</th>
+                            <th>Prefix</th>
+                            <th>Subnet Mask</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${subnetsData.map(subnet => {
+                            let requiredBits = Math.ceil(Math.log2(subnet.hosts + 2)); // +2 for network and broadcast
+                            let subnetPrefix = 32 - requiredBits;
+                            let subnetMask = calculateSubnetMask(subnetPrefix);
+                            let firstHost = calculateNextSubnet(currentNetwork, 1);
+                            let lastHost = calculateNextSubnet(currentNetwork, (Math.pow(2, 32 - subnetPrefix) - 2));
+                            let broadcast = calculateNextSubnet(currentNetwork, (Math.pow(2, 32 - subnetPrefix) - 1));
+    
+                            let result = `
+                                <tr>
+                                    <td>${subnet.name}</td>
+                                    <td>${currentNetwork}/${subnetPrefix}</td>
+                                    <td>${firstHost}</td>
+                                    <td>${lastHost}</td>
+                                    <td>${broadcast}</td>
+                                    <td>/${subnetPrefix}</td>
+                                    <td>${subnetMask}</td>
+                                </tr>
+                            `;
+                            currentNetwork = calculateNextSubnet(currentNetwork, Math.pow(2, 32 - subnetPrefix));
+    
+                            return result;
+                        }).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+    </script>
+    
+</body>
+</html>
